@@ -1,0 +1,190 @@
+import numpy as np
+import scipy as sp
+import matplotlib.pyplot as plt
+
+def d1(S,K,T,r,sigma):
+    a=np.log(S / K) + (r + 0.5 * sigma**2) * T
+    b=sigma*np.sqrt(T)
+    return a/b
+
+
+def d2(S,K,T,r,sigma):
+
+    return d1(S,K,T,r,sigma) - sigma*np.sqrt(T)
+
+def call_price(S, K, T, r, sigma):
+
+    D1=d1(S,K,T,r,sigma)
+    D2 =d2(S, K, T, r, sigma)
+
+    C=(S*sp.stats.norm.cdf(D1))-(K*np.exp(-r*T)*sp.stats.norm.cdf(D2))
+
+    return C
+
+def put_price(S, K, T, r, sigma):
+
+    D1=d1(S,K,T,r,sigma)
+    D2 =d2(S, K, T, r, sigma)
+
+    P=K*sp.stats.norm.cdf(-D2)*np.exp(-r*T)-S*sp.stats.norm.cdf(-D1)
+
+    return P
+
+def black_scholes(S, K, T, r, sigma):
+
+    D1=d1(S,K,T,r,sigma)
+    D2=d2(S, K, T, r, sigma)
+    call=call_price(S, K, T, r, sigma)
+    put=put_price(S, K, T, r, sigma)
+
+    return{
+
+        "call":call,
+        "put":put,
+        "d1":D1,
+        "d2":D2,
+
+    }
+
+def check_parity(S,K,T,r,sigma,tolerance=1e-6):
+
+    C = call_price(S, K, T, r, sigma)
+    P = put_price(S, K, T, r, sigma)
+
+    lhs=C-P
+    rhs=S-K*np.exp(-r*T)
+
+    difference=abs(lhs-rhs)
+
+    if difference<tolerance:
+        print("Put-call parity: PASSED")
+
+    else:
+        print("put-call parity: FAILED")
+
+    return difference
+
+def delta(S,K,T,r, sigma, option_type):
+    D1 = d1(S, K, T, r, sigma)
+
+    dellc=sp.stats.norm.cdf(D1)
+
+    dellp=sp.stats.norm.cdf(D1)-1
+
+    if option_type=="call":
+        return dellc
+    elif option_type=="put":
+        return dellp
+    else:
+        raise ValueError("option_type must be 'call' or 'put'")
+
+
+def gamma(S,K,T,r,sigma):
+
+    D1=d1(S,K,T,r,sigma)
+
+
+    a=sp.stats.norm.pdf(D1)
+    b=S*sigma*np.sqrt(T)
+
+    return a/b
+
+def theta(S,K,T,r,sigma,option_type):
+    D1 = d1(S, K, T, r, sigma)
+    D2 = d2(S, K, T, r, sigma)
+
+    a=-(S*sp.stats.norm.pdf(D1)*sigma)/(2*np.sqrt(T))
+    b=-r*K*np.exp(-r*T)*sp.stats.norm.cdf(D2)
+    c=r*K*np.exp(-r*T)*sp.stats.norm.cdf(-D2)
+
+    if option_type=="call":
+        return a+b
+
+    elif option_type=="put":
+        return a+c
+    else:
+        raise ValueError("option_type must be 'call' or 'put'")
+
+
+def vega(S,K,T,r,sigma):
+    D1 = d1(S, K, T, r, sigma)
+
+    x=S*sp.stats.norm.pdf(D1)*np.sqrt(T)
+
+    return x
+
+def rho(S,K,T,r,sigma,option_type):
+    D2 = d2(S, K, T, r, sigma)
+
+    rhoc=K*T*np.exp(-r*T)*sp.stats.norm.cdf(D2)
+    rhop=-K*T*np.exp(-r*T)*sp.stats.norm.cdf(-D2)
+
+    if option_type=="call":
+       return rhoc
+
+    elif option_type=="put":
+        return rhop
+    else:
+        raise ValueError("option_type must be 'call' or 'put'")
+
+def greeks(S,K,T,r,sigma,option_type):
+    return{
+
+        "delta":delta(S, K, T, r, sigma, option_type),
+        "gamma":gamma(S, K, T, r, sigma),
+        "theta":theta(S,K,T,r,sigma,option_type),
+        "vega":vega(S,K,T,r,sigma),
+        "rho":rho(S,K,T,r,sigma,option_type)
+    }
+
+if __name__=="__main__":
+
+    S=100
+    K=105
+    T=0.5
+    r=0.05
+    sigma=0.20
+    option_type="call"
+
+    print(45*"=")
+    print("       BLACK-SCHOLES OPTION PRICER")
+    print(45*"=")
+
+    print("INPUTS:")
+    print(f"stock price(S):{S}")
+    print(f"strike price(K):{K}")
+    print(f"time to expiry(T):{T}")
+    print(f"riskfree rate(r):{r}")
+    print(f"volatility(sigma):{sigma}")
+
+    result=black_scholes(S,K,T,r,sigma)
+
+    print("\n INTERMEDIATES")
+    print(f"d1:{result['d1']:.4f}")
+    print(f"d2:{result['d2']:.4f}")
+    print(f"N(d1):{sp.stats.norm.cdf(result['d1']):.4f}")
+    print(f"N(d2):{sp.stats.norm.cdf(result['d2']):.4f}")
+
+    print("\n RESULTS")
+    print(f"call price: ₹{result['call']:.4f}")
+    print(f"put price:₹{result['put']:.4f}")
+
+    check_parity(S,K,T,r,sigma)
+
+    g=greeks(S,K,T,r,sigma,option_type)
+
+    print(f"\nGREEKS ({option_type})")
+    print(f"delta:{g['delta']:.4f}")
+    print(f"gamma:{g['gamma']:.4f}")
+    print(f"theta:{g['theta']/365:.4f}")
+    print(f"vega:{g['vega']/100:.4f}")
+    print(f"rho:{g['rho']/100:.4f}")
+
+    S_range=np.linspace(50,150,200)
+    call_prices=[call_price(S,105,0.5,0.05,0.20) for S in S_range]
+
+    plt.plot(S_range,call_prices)
+    plt.show()
+
+    np.linspace(start, stop, num)
+    np.linspace()
